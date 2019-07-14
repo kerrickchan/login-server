@@ -8,7 +8,7 @@ export async function encrypt(password) {
   let cipher = crypto.createCipheriv(algorithm, process.env.CRYPTO_KEY, iv);
   let encrypted = cipher.update(password);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
-
+  logger.debug('iv', iv.toString('hex'))
   return { iv: iv.toString('hex'), data: encrypted.toString('hex') };
 }
 

@@ -1,6 +1,8 @@
 import crypto from 'crypto'
 import mongoose, { Document, Schema } from 'mongoose'
 import fakegoose from 'fakegoose'
+import moment from 'moment'
+
 import { IUser } from './user.model'
 
 export interface IToken extends Document {
@@ -41,5 +43,9 @@ export const TokenSchema = new Schema({
   }
 })
 TokenSchema.plugin(fakegoose)
+
+TokenSchema.methods.isExpired = function() {
+  return moment() >= moment(this.expiredAt)
+}
 
 export const Token = mongoose.model<IToken>('Token', TokenSchema)

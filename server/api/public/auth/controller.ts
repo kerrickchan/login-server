@@ -1,5 +1,4 @@
 import {Request, Response} from 'express'
-import passport from 'passport'
 import validator from 'validator'
 import crypto from 'crypto'
 import moment from 'moment'
@@ -12,7 +11,6 @@ import {TokenRepository} from '../../repositories/token.repository'
 import {BAD_REQUEST, NOT_ACCEPTABLE, INTERNAL_SERVER_ERROR} from '../../common/status'
 import {encrypt, decrypt, hash} from '../../services/password.service'
 import {sendActivateEmail} from '../../services/email.service'
-import {ClientResponse} from "@sendgrid/client/src/response"
 
 export class Controller {
   userRepo: UserRepository
@@ -25,20 +23,30 @@ export class Controller {
 
   public register = async (req: Request, res: Response): Promise<void> => {
     // validate
-    const {email, password} = req.body
+    const {username, password, password2} = req.body
   
-    if (!email) {
+    if (!username) {
       res.status(BAD_REQUEST).json({errors: [{msg: 'email cannot be empty'}]})
       return
     }
 
-    if (email && !validator.isEmail(email)) {
+    if (username && !validator.isEmail(username)) {
       res.status(BAD_REQUEST).json({errors: [{msg: 'email field is invalid'}]})
       return
     }
 
     if (!password) {
       res.status(BAD_REQUEST).json({errors: [{msg: 'password cannot be empty'}]})
+      return
+    }
+
+    if (!password2) {
+      res.status(BAD_REQUEST).json({errors: [{msg: 're-enter password cannot be empty'}]})
+      return
+    }
+
+    if (password != password2) {
+      res.status(BAD_REQUEST).json({errors: [{msg: 'password and re-enter password are not the same'}]})
       return
     }
 
@@ -50,7 +58,7 @@ export class Controller {
     const hashedPassword = await hash(decryptedPassword)
 
     // find existing
-    const user = await this.userRepo.findOne({email})
+    const user = await this.userRepo.findOne({username})
     if (user) {
       res.status(NOT_ACCEPTABLE).json({errors: [{msg: 'email already exists'}]})
       return
@@ -58,13 +66,13 @@ export class Controller {
 
     // register success
     const isActivated = false
-    const createdUser = await this.userRepo.create({email, hashedPassword, isActivated})
+    const createdUser = await this.userRepo.create({username, password: hashedPassword, isActivated})
     if(createdUser) {
       const token = crypto.randomBytes(64).toString('hex')
-      const expiredAt = moment().add(30, 'minutes').format()
+      const expiredAt = moment().add(14, 'days').format()
       this.tokenRepo.create({user: createdUser._id, token, expiredAt})
 
-      sendActivateEmail('ericspi@outlook.com', token)
+      sendActivateEmail(username, token)
       res.json({success: true, data: {}, errors: []})
       return
     }
@@ -83,7 +91,10 @@ export class Controller {
     }
 
     const sentToken = await this.tokenRepo.findOne({token})
-    if (sentToken.token === token) {
+    if (sentToken.isExpired()) {
+      res.status(NOT_ACCEPTABLE).json({errors: [{msg: 'token expired'}]})
+      return
+    } else if (sentToken.token === token) {
       const user = await this.userRepo.findById(sentToken.user)
       user.isActivated = true
       user.save()
@@ -92,7 +103,9 @@ export class Controller {
     res.json({success: true, data: {}, errors: []})
   }
 
-  // public login = async (req: Request, res: Response): Promise<void> => {}
+  public login = async (req: Request, res: Response): Promise<void> => {
+    res.json({msg: 'it works'})
+  }
   // public refresh async (req: Request, res: Response): Promise<void> => {}
   // public check async (req: Request, res: Response): Promise<void> => {}
   // public sendCode async (req: Request, res: Response): Promise<void> => {}

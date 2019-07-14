@@ -12,5 +12,6 @@ export const {
   DB_PORT,
   DB_NAME,
   DB_USER,
-  DB_PASS
+  DB_PASS,
+  SESSION_SECRET
 } = process.env

@@ -1,4 +1,4 @@
-class FakeHelper {
+class RandomHelper {
   /**
    * randomly pick an item from items array
    * @param items any
@@ -8,4 +8,4 @@ class FakeHelper {
   }
 }
 
-export default new FakeHelper()
+export default new RandomHelper()
