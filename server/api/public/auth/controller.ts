@@ -23,14 +23,19 @@ export class Controller {
 
   public register = async (req: Request, res: Response): Promise<void> => {
     // validate
-    const {username, password, password2} = req.body
-  
+    const {username, email, password, password2} = req.body
+
     if (!username) {
+      res.status(BAD_REQUEST).json({errors: [{msg: 'username cannot be empty'}]})
+      return
+    }
+
+    if (!email) {
       res.status(BAD_REQUEST).json({errors: [{msg: 'email cannot be empty'}]})
       return
     }
 
-    if (username && !validator.isEmail(username)) {
+    if (email && !validator.isEmail(email)) {
       res.status(BAD_REQUEST).json({errors: [{msg: 'email field is invalid'}]})
       return
     }
@@ -50,29 +55,26 @@ export class Controller {
       return
     }
 
-    // FIXME: remove in production. simulate client side
-    const encryptedPassword = await encrypt(password)
-
-    // decrypt password
-    const decryptedPassword = await decrypt(encryptedPassword)
-    const hashedPassword = await hash(decryptedPassword)
-
     // find existing
     const user = await this.userRepo.findOne({username})
     if (user) {
-      res.status(NOT_ACCEPTABLE).json({errors: [{msg: 'email already exists'}]})
+      res.status(NOT_ACCEPTABLE).json({errors: [{msg: 'username already exists'}]})
       return
     }
 
     // register success
     const isActivated = false
-    const createdUser = await this.userRepo.create({username, password: hashedPassword, isActivated})
+    const createdUser = await this.userRepo.create({username, email: [{value: email, type: 'main'}] ,isActivated})
+    await createdUser.setPassword(password)
+
+    // send email
     if(createdUser) {
       const token = crypto.randomBytes(64).toString('hex')
       const expiredAt = moment().add(14, 'days').format()
       this.tokenRepo.create({user: createdUser._id, token, expiredAt})
 
-      sendActivateEmail(username, token)
+      // FIXME: comment out for do not send active email
+      // sendActivateEmail(email, token)
       res.json({success: true, data: {}, errors: []})
       return
     }

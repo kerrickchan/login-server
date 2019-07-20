@@ -3,6 +3,7 @@ import fakegoose from 'fakegoose';
 import crypto from 'crypto'
 
 import RandomHelper from '../helpers/random.helper'
+import logger from '../../common/logger';
 
 export enum UserGender {
     Male = 'M',
@@ -10,36 +11,39 @@ export enum UserGender {
 }
 
 export interface IUser extends Document {
-    publicId: string;
-    username: string;
-    hash: string;
-    salt: string;
-    provider: string
-    displayName: string
-    name: {
-      familyName: string,
-      givenName: string,
-      middleName: string
+  publicId: string;
+  username: string;
+  hash: string;
+  salt: string;
+  // Passport user profile data
+  provider: string
+  displayName: string
+  name: {
+    familyName: string,
+    givenName: string,
+    middleName: string
+  }
+  email: [
+    {
+      value: string,
+      type: string
     }
-    email: [
-      {
-        value: string,
-        type: string
-      }
-    ]
-    photos: [
-      {
-        value: string
-      }
-    ]
-    phone: string;
-    gender: UserGender;
-    birthday: Date;
-    isActivated: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+  ]
+  photos: [
+    {
+      value: string
+    }
+  ]
+  // Profile data
+  phone: string;
+  gender: UserGender;
+  birthday: Date;
+  isActivated: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 
-    validPassword(hashedPassword: string): boolean
+  setPassword(password: string): void
+  validPassword(hashedPassword: string): boolean
 }
 
 export const UserSchema = new Schema({
@@ -51,6 +55,8 @@ export const UserSchema = new Schema({
   },
   username: {
     type: String,
+    unique: true,
+    required: true,
     fake: 'internet.email',
   },
   hash: {
@@ -86,16 +92,18 @@ export const UserSchema = new Schema({
       fake: 'name.findName'
     },
   },
-  email: {
-    value: {
-      type: String,
-      fake: 'internet.email'
-    },
-    type: {
-      type: String,
-      fake: () => RandomHelper.randomPick(['home', 'work', 'other'])
+  email: [
+    {
+      value: {
+        type: String,
+        fake: 'internet.email'
+      },
+      type: {
+        type: String,
+        fake: () => RandomHelper.randomPick(['home', 'work', 'other'])
+      }
     }
-  },
+  ],
   photos: [
     {
       type: String,
@@ -137,14 +145,16 @@ export const UserSchema = new Schema({
 });
 UserSchema.plugin(fakegoose)
 
-UserSchema.methods.setPassword = function(password: string) {
-  this.salt = crypto.randomBytes(16).toString('hex')
-  this.password = crypto.pbkdf2Sync(password, this.salt, 10000, 512, 'sha512').toString('hex')
-  this.save()
+UserSchema.methods.setPassword = async function(password: string): Promise<void> {
+  const salt = crypto.randomBytes(16)
+  this.salt = salt.toString('hex')
+  this.hash = crypto.pbkdf2Sync(password, salt, 10000, 512, 'sha512').toString('hex')
+  await this.save()
 }
 
-UserSchema.methods.validPassword = function(hashedPassword: string) {
-  return hashedPassword === this.password
+UserSchema.methods.validPassword = async function(password: string): Promise<boolean> {
+  const hashedPassword = crypto.pbkdf2Sync(password, Buffer.from(this.salt), 10000, 512, 'sha512').toString('hex')
+  return hashedPassword === this.hash
 }
 
 export const User = mongoose.model<IUser>('User', UserSchema);

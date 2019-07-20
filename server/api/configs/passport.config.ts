@@ -12,12 +12,25 @@ export function passportConfig(app: Application) {
   // Setup passport middleware
   passport.use(new LocalStrategy(
     {
-      usernameField: 'email',
+      usernameField: 'username',
       passwordField: 'password'
     },
-    function(email: string, password: string, done: any) {
-      logger.debug('email is ' + email)
-      done(null, true)
+    function(username: string, password: string, done: any) {
+      logger.debug('password is ', password)
+      User.findOne({username}, (err: any, user: IUser) => {
+        if (err) return done(err)
+
+        if (!user) {
+          return done(null, false, {errors: [{ msg: 'Incorrect username.' }]});
+        }
+
+        logger.debug('password is ', password)
+        if (!user.validPassword(password)) {
+          return done(null, false, {errors: [{ msg: 'Incorrect password.' }]});
+        }
+
+        return done(null, user)
+      })
     }
   ))
 
